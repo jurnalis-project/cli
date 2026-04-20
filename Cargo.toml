@@ -1,6 +1,6 @@
 [package]
 name = "jurnalis-cli"
-version = "0.39.0"
+version = "0.1.0"
 edition = "2021"
 
 [[bin]]
@@ -8,8 +8,9 @@ name = "jurnalis-cli"
 path = "src/main.rs"
 
 [features]
-dev = []
+dev = ["jurnalis-engine/dev"]
 
 [dependencies]
+clap = { version = "4", features = ["derive"] }
 jurnalis-engine = { path = "../jurnalis-engine" }
 serde_json = "1"
