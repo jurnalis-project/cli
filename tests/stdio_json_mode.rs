@@ -2,11 +2,6 @@
 //!
 //! These tests exercise the stdio-json protocol by sending JSONL requests to
 //! the binary's stdin and validating structured JSONL responses on stdout.
-//!
-//! NOTE: The `stdio-json` mode is tracked by issue #168 and may not be
-//! implemented yet. These tests are written against the protocol spec and
-//! will pass once #168 is merged. They are gated behind `#[ignore]` until
-//! the feature lands.
 
 use std::io::{BufRead, BufReader, Write};
 use std::process::{Command, Stdio};
@@ -57,7 +52,6 @@ fn send_request(
 // --------------------------------------------------------------------------
 
 #[test]
-#[ignore = "requires stdio-json mode from #168"]
 fn stdio_json_start_new_returns_success() {
     let mut child = spawn_stdio_json();
     let mut stdin = child.stdin.take().unwrap();
@@ -74,25 +68,25 @@ fn stdio_json_start_new_returns_success() {
     assert_eq!(response["id"], "req-1");
     assert_eq!(response["ok"], true);
     assert!(
-        response["data"]["text"].is_array(),
+        response["result"]["text"].is_array(),
         "data.text should be an array: {:?}",
         response
     );
     assert!(
-        response["data"]["state"].is_string(),
+        response["result"]["state_json"].is_string(),
         "data.state should be a string: {:?}",
         response
     );
 
     // State should be valid JSON
-    let state_str = response["data"]["state"].as_str().unwrap();
+    let state_str = response["result"]["state_json"].as_str().unwrap();
     assert!(
         serde_json::from_str::<serde_json::Value>(state_str).is_ok(),
         "state should be valid JSON"
     );
 
     // Text should contain character creation prompts
-    let text_arr = response["data"]["text"].as_array().unwrap();
+    let text_arr = response["result"]["text"].as_array().unwrap();
     assert!(!text_arr.is_empty(), "text should not be empty");
 
     drop(stdin);
@@ -100,7 +94,6 @@ fn stdio_json_start_new_returns_success() {
 }
 
 #[test]
-#[ignore = "requires stdio-json mode from #168"]
 fn stdio_json_start_new_without_seed() {
     let mut child = spawn_stdio_json();
     let mut stdin = child.stdin.take().unwrap();
@@ -116,15 +109,14 @@ fn stdio_json_start_new_without_seed() {
 
     assert_eq!(response["id"], "req-noseed");
     assert_eq!(response["ok"], true);
-    assert!(response["data"]["text"].is_array());
-    assert!(response["data"]["state"].is_string());
+    assert!(response["result"]["text"].is_array());
+    assert!(response["result"]["state_json"].is_string());
 
     drop(stdin);
     child.wait().ok();
 }
 
 #[test]
-#[ignore = "requires stdio-json mode from #168"]
 fn stdio_json_input_processes_player_command() {
     let mut child = spawn_stdio_json();
     let mut stdin = child.stdin.take().unwrap();
@@ -139,7 +131,7 @@ fn stdio_json_input_processes_player_command() {
     let start_resp = send_request(&mut stdin, &mut stdout, &start_req);
     assert_eq!(start_resp["ok"], true);
 
-    let state = start_resp["data"]["state"].as_str().unwrap().to_string();
+    let state = start_resp["result"]["state_json"].as_str().unwrap().to_string();
 
     // Send "1" to choose a race during character creation
     let input_req = serde_json::json!({
@@ -155,18 +147,18 @@ fn stdio_json_input_processes_player_command() {
     assert_eq!(input_resp["id"], "input-1");
     assert_eq!(input_resp["ok"], true);
     assert!(
-        input_resp["data"]["text"].is_array(),
+        input_resp["result"]["text"].is_array(),
         "data.text should be array: {:?}",
         input_resp
     );
     assert!(
-        input_resp["data"]["state"].is_string(),
+        input_resp["result"]["state_json"].is_string(),
         "data.state should be string: {:?}",
         input_resp
     );
 
     // The state should have advanced (different from start state)
-    let new_state = input_resp["data"]["state"].as_str().unwrap();
+    let new_state = input_resp["result"]["state_json"].as_str().unwrap();
     assert_ne!(new_state, state, "State should change after valid input");
 
     drop(stdin);
@@ -174,7 +166,6 @@ fn stdio_json_input_processes_player_command() {
 }
 
 #[test]
-#[ignore = "requires stdio-json mode from #168"]
 fn stdio_json_full_character_creation_flow() {
     let mut child = spawn_stdio_json();
     let mut stdin = child.stdin.take().unwrap();
@@ -188,7 +179,7 @@ fn stdio_json_full_character_creation_flow() {
     });
     let start_resp = send_request(&mut stdin, &mut stdout, &start_req);
     assert_eq!(start_resp["ok"], true);
-    let mut state = start_resp["data"]["state"].as_str().unwrap().to_string();
+    let mut state = start_resp["result"]["state_json"].as_str().unwrap().to_string();
 
     // Drive through character creation
     let creation_inputs = ["1", "1", "1", "15 14 13 12 10 8", "1 2", "TestHero"];
@@ -203,7 +194,7 @@ fn stdio_json_full_character_creation_flow() {
         });
         let resp = send_request(&mut stdin, &mut stdout, &req);
         assert_eq!(resp["ok"], true, "Step {} failed: {:?}", i, resp);
-        state = resp["data"]["state"].as_str().unwrap().to_string();
+        state = resp["result"]["state_json"].as_str().unwrap().to_string();
     }
 
     // After character creation, send "look" to verify exploration mode
@@ -218,7 +209,7 @@ fn stdio_json_full_character_creation_flow() {
     let look_resp = send_request(&mut stdin, &mut stdout, &look_req);
     assert_eq!(look_resp["ok"], true);
 
-    let text = look_resp["data"]["text"].as_array().unwrap();
+    let text = look_resp["result"]["text"].as_array().unwrap();
     // "look" in exploration mode should produce location description text
     assert!(
         !text.is_empty(),
@@ -234,7 +225,6 @@ fn stdio_json_full_character_creation_flow() {
 // --------------------------------------------------------------------------
 
 #[test]
-#[ignore = "requires stdio-json mode from #168"]
 fn stdio_json_save_and_load_round_trip() {
     let tmp_dir = std::env::temp_dir().join(format!(
         "jurnalis_stdio_save_{}",
@@ -262,7 +252,7 @@ fn stdio_json_save_and_load_round_trip() {
         "params": {"seed": 42}
     });
     let start_resp = send_request(&mut stdin, &mut stdout, &start_req);
-    let state = start_resp["data"]["state"].as_str().unwrap().to_string();
+    let state = start_resp["result"]["state_json"].as_str().unwrap().to_string();
 
     // Save the state
     let save_req = serde_json::json!({
@@ -286,11 +276,13 @@ fn stdio_json_save_and_load_round_trip() {
     let load_resp = send_request(&mut stdin, &mut stdout, &load_req);
     assert_eq!(load_resp["id"], "load-1");
     assert_eq!(load_resp["ok"], true);
-    assert!(load_resp["data"]["state"].is_string());
+    assert!(load_resp["result"]["state_json"].is_string());
 
-    // Loaded state should match what we saved
-    let loaded_state = load_resp["data"]["state"].as_str().unwrap();
-    assert_eq!(loaded_state, state, "Loaded state should match saved state");
+    // Loaded state should match what we saved (compare as JSON to ignore key order)
+    let loaded_state = load_resp["result"]["state_json"].as_str().unwrap();
+    let saved_json: serde_json::Value = serde_json::from_str(&state).unwrap();
+    let loaded_json: serde_json::Value = serde_json::from_str(loaded_state).unwrap();
+    assert_eq!(loaded_json, saved_json, "Loaded state should match saved state");
 
     drop(stdin);
     child.wait().ok();
@@ -298,7 +290,6 @@ fn stdio_json_save_and_load_round_trip() {
 }
 
 #[test]
-#[ignore = "requires stdio-json mode from #168"]
 fn stdio_json_start_from_save() {
     let tmp_dir = std::env::temp_dir().join(format!(
         "jurnalis_stdio_fromsave_{}",
@@ -334,8 +325,8 @@ fn stdio_json_start_from_save() {
 
     assert_eq!(resp["id"], "from-save-1");
     assert_eq!(resp["ok"], true);
-    assert!(resp["data"]["text"].is_array());
-    assert!(resp["data"]["state"].is_string());
+    assert!(resp["result"]["text"].is_array());
+    assert!(resp["result"]["state_json"].is_string());
 
     drop(stdin);
     child.wait().ok();
@@ -347,7 +338,6 @@ fn stdio_json_start_from_save() {
 // --------------------------------------------------------------------------
 
 #[test]
-#[ignore = "requires stdio-json mode from #168"]
 fn stdio_json_unknown_operation_returns_error() {
     let mut child = spawn_stdio_json();
     let mut stdin = child.stdin.take().unwrap();
@@ -378,7 +368,6 @@ fn stdio_json_unknown_operation_returns_error() {
 }
 
 #[test]
-#[ignore = "requires stdio-json mode from #168"]
 fn stdio_json_invalid_json_returns_error() {
     let mut child = spawn_stdio_json();
     let mut stdin = child.stdin.take().unwrap();
@@ -402,7 +391,6 @@ fn stdio_json_invalid_json_returns_error() {
 }
 
 #[test]
-#[ignore = "requires stdio-json mode from #168"]
 fn stdio_json_load_nonexistent_returns_error() {
     let tmp_dir = std::env::temp_dir().join(format!(
         "jurnalis_stdio_noload_{}",
@@ -444,7 +432,6 @@ fn stdio_json_load_nonexistent_returns_error() {
 // --------------------------------------------------------------------------
 
 #[test]
-#[ignore = "requires stdio-json mode from #168"]
 fn stdio_json_stdout_is_protocol_pure() {
     let mut child = spawn_stdio_json();
     let mut stdin = child.stdin.take().unwrap();
@@ -513,7 +500,6 @@ fn stdio_json_stdout_is_protocol_pure() {
 }
 
 #[test]
-#[ignore = "requires stdio-json mode from #168"]
 fn stdio_json_eof_exits_cleanly() {
     let mut child = spawn_stdio_json();
     let stdin = child.stdin.take().unwrap();
@@ -539,7 +525,6 @@ fn stdio_json_eof_exits_cleanly() {
 }
 
 #[test]
-#[ignore = "requires stdio-json mode from #168"]
 fn stdio_json_multiple_requests_in_sequence() {
     let mut child = spawn_stdio_json();
     let mut stdin = child.stdin.take().unwrap();
@@ -562,7 +547,6 @@ fn stdio_json_multiple_requests_in_sequence() {
 }
 
 #[test]
-#[ignore = "requires stdio-json mode from #168"]
 fn stdio_json_request_ids_are_echoed_back() {
     let mut child = spawn_stdio_json();
     let mut stdin = child.stdin.take().unwrap();
