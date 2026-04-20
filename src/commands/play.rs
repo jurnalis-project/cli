@@ -112,7 +112,8 @@ fn run_repl_loop<R: BufRead, W: Write>(
 
 /// Run the REPL loop with injectable I/O for testability.
 /// Returns when the user types "quit" or "exit", or when input is exhausted.
-pub fn run_repl<R: BufRead, W: Write>(reader: &mut R, writer: &mut W, seed: u64) -> io::Result<()> {
+#[cfg(test)]
+fn run_repl<R: BufRead, W: Write>(reader: &mut R, writer: &mut W, seed: u64) -> io::Result<()> {
     let save_dir = std::path::PathBuf::from("saves");
     run_repl_with_save_dir(reader, writer, seed, &save_dir)
 }
