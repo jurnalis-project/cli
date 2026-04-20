@@ -1,0 +1,15 @@
+[package]
+name = "jurnalis-cli"
+version = "0.39.0"
+edition = "2021"
+
+[[bin]]
+name = "jurnalis-cli"
+path = "src/main.rs"
+
+[features]
+dev = []
+
+[dependencies]
+jurnalis-engine = { path = "../jurnalis-engine" }
+serde_json = "1"
