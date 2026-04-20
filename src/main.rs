@@ -144,6 +144,15 @@ fn run_repl_with_save_dir<R: BufRead, W: Write>(
     run_repl_loop(reader, writer, &mut state_json, save_dir)
 }
 
+/// Parse the `--save-dir <path>` flag from a list of arguments.
+/// Returns the custom path if present, otherwise `None`.
+fn parse_save_dir(args: &[String]) -> Option<std::path::PathBuf> {
+    args.iter()
+        .position(|a| a == "--save-dir")
+        .and_then(|pos| args.get(pos + 1))
+        .map(std::path::PathBuf::from)
+}
+
 fn main() {
     let seed = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -155,10 +164,12 @@ fn main() {
     let mut reader = stdin.lock();
     let mut writer = stdout.lock();
 
+    let args: Vec<String> = std::env::args().collect();
+    let save_dir = parse_save_dir(&args).unwrap_or_else(|| std::path::PathBuf::from("saves"));
+
     // Dev mode: --dev-state <file> injects an arbitrary pre-crafted GameState.
     #[cfg(feature = "dev")]
     {
-        let args: Vec<String> = std::env::args().collect();
         if let Some(pos) = args.iter().position(|a| a == "--dev-state") {
             if let Some(path) = args.get(pos + 1) {
                 let state_json = match std::fs::read_to_string(path) {
@@ -175,7 +186,6 @@ fn main() {
                 if output.state_json.is_empty() {
                     std::process::exit(1);
                 }
-                let save_dir = std::path::PathBuf::from("saves");
                 if let Err(e) = run_repl_from_state(&mut reader, &mut writer, output.state_json, &save_dir) {
                     eprintln!("Error: {}", e);
                     std::process::exit(1);
@@ -188,7 +198,7 @@ fn main() {
         }
     }
 
-    if let Err(e) = run_repl(&mut reader, &mut writer, seed) {
+    if let Err(e) = run_repl_with_save_dir(&mut reader, &mut writer, seed, &save_dir) {
         eprintln!("Error: {}", e);
         std::process::exit(1);
     }
@@ -311,6 +321,65 @@ mod tests {
         // Should have printed initial game output but no farewell
         assert!(!output_str.contains("Farewell, adventurer."));
         assert!(!output_str.is_empty());
+    }
+
+    #[test]
+    fn parse_save_dir_extracts_custom_path() {
+        let args: Vec<String> = vec![
+            "jurnalis-cli".into(),
+            "--save-dir".into(),
+            "/tmp/custom-saves".into(),
+        ];
+        let result = parse_save_dir(&args);
+        assert_eq!(result, Some(std::path::PathBuf::from("/tmp/custom-saves")));
+    }
+
+    #[test]
+    fn parse_save_dir_returns_none_when_absent() {
+        let args: Vec<String> = vec!["jurnalis-cli".into()];
+        let result = parse_save_dir(&args);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn save_dir_override_saves_to_custom_directory() {
+        let custom_dir = std::env::temp_dir().join(format!(
+            "jurnalis_cli_custom_save_dir_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&custom_dir);
+        std::fs::create_dir_all(&custom_dir).unwrap();
+
+        // Create a character and save to the custom directory
+        let input = b"1\n1\n1\n15 14 13 12 10 8\n1 2\nTestHero\nsave mysave\nquit\n";
+        let mut reader = Cursor::new(&input[..]);
+        let mut output = Vec::new();
+
+        run_repl_with_save_dir(&mut reader, &mut output, 42, &custom_dir).unwrap();
+
+        let out = String::from_utf8(output).unwrap();
+        assert!(
+            out.contains("Saved game to mysave.json"),
+            "Expected save confirmation, got: {}",
+            out
+        );
+
+        // Verify the save file actually landed in the custom directory
+        let save_path = custom_dir.join("mysave.json");
+        assert!(
+            save_path.exists(),
+            "Save file should exist at {:?}",
+            save_path
+        );
+
+        // Verify no save file was created in the default "saves/" directory
+        let default_save = std::path::Path::new("saves/mysave.json");
+        assert!(
+            !default_save.exists(),
+            "Save should NOT exist in default saves/ directory"
+        );
+
+        std::fs::remove_dir_all(&custom_dir).ok();
     }
 
     #[test]
