@@ -64,6 +64,7 @@ jobs:
         shell: bash
         run: |
           perl -pi -e 's|path = "\.\./jurnalis-engine"|git = "https://github.com/jurnalis-project/engine.git"|g' Cargo.toml
+          perl -pi -e 's/(jurnalis-engine = \{[^}]*), features = \["dev"\]/$1/g' Cargo.toml
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
