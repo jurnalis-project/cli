@@ -7,20 +7,19 @@ A standalone command-line REPL for the Jurnalis text-based CRPG engine.
 ### From a release archive
 
 Download the appropriate archive for your platform from the
-[GitHub Releases](https://github.com/yanekyuk/jurnalis/releases) page.
-CLI releases use tags prefixed with `cli-v` (for example `cli-v0.1.0`).
+[GitHub Releases](https://github.com/jurnalis-project/cli/releases) page.
 
 | Platform            | Archive                                       |
 |---------------------|-----------------------------------------------|
-| Linux (x86_64)      | `jurnalis-cli-cli-v<version>-x86_64-unknown-linux-gnu.tar.gz` |
-| macOS (Intel)       | `jurnalis-cli-cli-v<version>-x86_64-apple-darwin.tar.gz`      |
-| macOS (Apple Silicon)| `jurnalis-cli-cli-v<version>-aarch64-apple-darwin.tar.gz`     |
-| Windows (x86_64)    | `jurnalis-cli-cli-v<version>-x86_64-pc-windows-msvc.zip`     |
+| Linux (x86_64)      | `jurnalis-cli-<version>-linux-x86_64.tar.gz`       |
+| macOS (Intel)       | `jurnalis-cli-<version>-macos-intel.tar.gz`         |
+| macOS (Apple Silicon)| `jurnalis-cli-<version>-macos-apple-silicon.tar.gz`|
+| Windows (x86_64)    | `jurnalis-cli-<version>-windows-x86_64.zip`        |
 
 Extract the archive and place the `jurnalis-cli` binary somewhere on your `PATH`:
 
 ```bash
-tar xzf jurnalis-cli-cli-v0.1.0-x86_64-unknown-linux-gnu.tar.gz
+tar xzf jurnalis-cli-0.1.0-linux-x86_64.tar.gz
 sudo mv jurnalis-cli /usr/local/bin/
 ```
 
@@ -76,23 +75,13 @@ integration. This mode is not yet implemented.
 
 ## Release convention
 
-CLI releases are independent of engine releases. The naming conventions are:
+Releases are cut automatically on every push to `main`. The tag is the bare semver from `Cargo.toml` (e.g. `0.1.0`) and the release name is `jurnalis-cli v<version>`.
 
-| Subproject | Tag pattern   | Example        |
-|------------|---------------|----------------|
-| Engine     | `engine-v*`   | `engine-v0.9.0`|
-| CLI        | `cli-v*`      | `cli-v0.1.0`  |
+To cut a release:
 
-To cut a CLI release:
-
-1. Ensure the version in `jurnalis-cli/Cargo.toml` reflects the intended release.
-2. Push a tag matching `cli-v<semver>`:
-   ```bash
-   git tag cli-v0.1.0
-   git push origin cli-v0.1.0
-   ```
-3. The `release-cli.yml` workflow builds cross-platform binaries and creates a
-   GitHub Release with the archives attached.
+1. Bump the version in `Cargo.toml`.
+2. Push to `main` — the `cli-release.yml` workflow builds cross-platform binaries
+   and creates a GitHub Release with the archives attached.
 
 ## License
 
