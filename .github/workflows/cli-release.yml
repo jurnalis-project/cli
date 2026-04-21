@@ -44,12 +44,21 @@ jobs:
             bin: jurnalis-cli.exe
     runs-on: ${{ matrix.os }}
     steps:
-      - name: Checkout
+      - name: Checkout CLI
         uses: actions/checkout@v4
+        with:
+          path: cli
+
+      - name: Checkout engine
+        uses: actions/checkout@v4
+        with:
+          repository: jurnalis-project/engine
+          path: jurnalis-engine
 
       - name: Read CLI version
         id: version
         shell: bash
+        working-directory: cli
         run: |
           set -euo pipefail
           version=$(grep -m1 '^version' Cargo.toml | sed -E 's/version *= *"([^"]+)"/\1/')
@@ -59,12 +68,6 @@ jobs:
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "CLI version: $version"
-
-      - name: Patch engine dependency
-        shell: bash
-        run: |
-          perl -pi -e 's|path = "\.\./jurnalis-engine"|git = "https://github.com/jurnalis-project/engine.git"|g' Cargo.toml
-          perl -pi -e 's/(jurnalis-engine = \{[^}]*), features = \["dev"\]/$1/g' Cargo.toml
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -77,32 +80,35 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            target
-          key: ${{ runner.os }}-${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock', '**/Cargo.toml') }}
+            cli/target
+          key: ${{ runner.os }}-${{ matrix.target }}-cargo-${{ hashFiles('cli/Cargo.toml', 'jurnalis-engine/Cargo.toml') }}
 
       - name: Build jurnalis-cli
+        working-directory: cli
         run: cargo build --release --bin jurnalis-cli --target ${{ matrix.target }}
 
       - name: Package (unix)
         if: matrix.archive == 'tar.gz'
         shell: bash
+        working-directory: cli
         run: |
           set -euo pipefail
           staging="jurnalis-cli-${{ steps.version.outputs.version }}-${{ matrix.asset_suffix }}"
           mkdir -p "$staging"
           cp "target/${{ matrix.target }}/release/${{ matrix.bin }}" "$staging/"
           tar -czf "$staging.tar.gz" "$staging"
-          echo "ASSET=$staging.tar.gz" >> "$GITHUB_ENV"
+          echo "ASSET=cli/$staging.tar.gz" >> "$GITHUB_ENV"
 
       - name: Package (windows)
         if: matrix.archive == 'zip'
         shell: pwsh
+        working-directory: cli
         run: |
           $staging = "jurnalis-cli-${{ steps.version.outputs.version }}-${{ matrix.asset_suffix }}"
           New-Item -ItemType Directory -Force -Path $staging | Out-Null
           Copy-Item "target/${{ matrix.target }}/release/${{ matrix.bin }}" "$staging/"
           Compress-Archive -Path $staging -DestinationPath "$staging.zip"
-          Add-Content -Path $env:GITHUB_ENV -Value "ASSET=$staging.zip"
+          Add-Content -Path $env:GITHUB_ENV -Value "ASSET=cli/$staging.zip"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
